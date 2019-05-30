@@ -1,0 +1,22 @@
+Documentation()
+New import codeunit for PlanningEdge
+--------------------------------------------------------
+Global Varibles:
+Name	DataType    Subtype	Length
+PlanningEdgeImport	Dataport	PlanningEdgeImport
+FileRec	Record	File
+--------------------------------------------------------		
+
+OnRun()
+FileRec.SETRANGE(Path, '\\lmnav\PE_TEST\out');
+FileRec.SETRANGE(FileRec."Is a file", TRUE);
+IF FileRec.FIND('-') THEN REPEAT
+  IF NOT EXISTS('\\lmnav\PE_TEST\out\ARCHIVED\' + FileRec.Name) THEN BEGIN
+  CLEAR(PlanningEdgeImport);
+  PlanningEdgeImport.FILENAME := FileRec.Path+ '\' + FileRec.Name;
+  PlanningEdgeImport.RUNMODAL;
+  //You might want to move/delete the file here...
+  FILE.COPY(FileRec.Path+ '\' + FileRec.Name, '\\lmnav\PE_TEST\out\ARCHIVED\' + FileRec.Name);
+  FILE.ERASE(FileRec.Path+ '\' + FileRec.Name)
+  END;
+UNTIL FileRec.NEXT = 0;
