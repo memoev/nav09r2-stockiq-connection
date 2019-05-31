@@ -5,7 +5,20 @@ Global Varibles:
 Name	DataType    Subtype	Length
 StockIQImport	Dataport	StockIQImport
 FileRec	Record	File
---------------------------------------------------------		
+--------------------------------------------------------
+Parameters : (SIQPOTO)
+Var	Name	DataType	Subtype	Length
+No	SIQNumber	Text		30
+
+Local Varibles: (SIQPOTO)
+Name	DataType    Subtype	Length
+dascounter	Integer	
+
+Return Value: (SIQPOTO)
+Name: OrderType
+Return Type: Text
+Length: 30
+--------------------------------------------------------			
 
 OnRun()
 SIQPOTO('SIQ-PO00001')
