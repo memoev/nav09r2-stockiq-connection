@@ -1,6 +1,6 @@
 Documentation()
 Dataport to parse files coming from the Planning Edge SFTP server
-//NEED TO CHANGE PROPERTIES -  READ PIPE-DOWN DELIMTED FILE!!!
+//NEED TO CHANGE PROPERTIES -  READ PIPE-DOWN DELIMITED FILE!!!
 -------------------------------------------------------------------
 DataItem	Name
 Purchase Line	<Purchase Line>
@@ -79,7 +79,8 @@ VendorNo	Code		20
 CommentLine	Record	Purch. Comment Line	
 TOHeader	Record	Transfer Header	
 TOLine	Record	Transfer Line	
-TranCommLine	Record	Inventory Comment Line	
+TranCommLine	Record	Inventory Comment Line
+OrderType   Text    30	
 
 Dataport - OnInitDataport()
 
@@ -109,14 +110,14 @@ Purchase Line - OnBeforeImportRecord()
 
 Purchase Line - OnAfterImportRecord()
 //Here we figure out if the file is a PO or a TO
-OrderType := StockIQImport.SIQPOTO(StockIqOrderNumber)
-
+OrderType := StockIQImport.SIQPOTO(StockIqOrderNumber);
+VendorNo : = GetVendorNo(ItemCode);
 
 CASE OrderType OF
   OrderType := 'PO' : BEGIN
     IF GUIALLOWED THEN
     //MESSAGE(FORMAT(ItemNum));  // delete me
-    IF ValidItemNo(ItemNum) THEN BEGIN
+    IF ValidItemNo(ItemCode) THEN BEGIN
       CreatePOHeader;
       LineCounter += 1;
       POLine.INIT;
@@ -240,6 +241,14 @@ IF NOT HeaderCreated THEN BEGIN
   TranCommLine.INSERT(TRUE);
 
 END;
+
+GetVendorNo(ItemNo : Code[20]) : VendorNo : Code[20]
+// Do stuff here to get vendor number
+IF Item.GET(ItemNo) THEN
+  VendorNo := Item."Vendor No.";
+
+EXIT(VendorNo);
+
 
 ValidItemNo(ItemNo : Code[20]) : Boolean
 // Do stuff here to make sure it is a valid item number
