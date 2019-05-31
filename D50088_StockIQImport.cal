@@ -1,0 +1,251 @@
+Documentation()
+Dataport to parse files coming from the Planning Edge SFTP server
+//NEED TO CHANGE PROPERTIES -  READ PIPE-DOWN DELIMTED FILE!!!
+-------------------------------------------------------------------
+DataItem	Name
+Purchase Line	<Purchase Line>
+-------------------------------------------------------------------
+DATAPORT FIELDS
+Enabled	SourceExpr	StartPos	Width
+Yes	StockIqOrderNumber	0	0
+Yes	StockIqLineNumber	0	0
+Yes	ErpLineNumber	0	0
+Yes	ItemCode	0	0
+Yes	SiteCode	0	0
+Yes	Upc	0	0
+Yes	BuyerCode	0	0
+Yes	ItemDescription	0	0
+Yes	UnitOfMeasure	0	0
+Yes	StockIqStatus	0	0
+Yes	ReleaseQuantity	0	0
+Yes	PurchaseCost	0	0
+Yes	PurchaseCostCurrency	0	0
+Yes	PurchaseUnitOfMeasure	0	0
+Yes	StockingUnitsPerPurchaseUnits	0	0
+Yes	PurchaseQuantity	0	0
+Yes	PurchaseQuantityCost	0	0
+Yes	ExpectedShipDate	0	0
+Yes	ExpectedDockDate	0	0
+Yes	InternalLineComment	0	0
+Yes	ExternalLineComment	0	0
+Yes	ApprovedByUserName	0	0
+Yes	ConfirmedByUserName	0	0
+Yes	BranchCode	0	0
+Yes	SupplierItemCode	0	0
+Yes	UnitCubes	0	0
+Yes	UnitWeight	0	0
+Yes	SalesOrderNumber	0	0
+Yes	SalesOrderLineNumber	0	0
+-------------------------------------------------------------------
+GLOBAL VARIABLES
+Name	DataType	Subtype	Length
+StockIqOrderNumber  Text    30  
+StockIqLineNumber   Text    30
+ErpLineNumber   Text    30
+ItemCode    Text    30
+SiteCode    Text    30
+Upc Text    30
+BuyerCode   Text    30
+ItemDescription Text    100
+UnitOfMeasure   Text    30
+StockIqStatus   Text    30
+ReleaseQuantity Decimal
+PurchaseCost    Decimal
+PurchaseCostCurrency    Decimal
+PurchaseUnitOfMeasure   Text    30
+StockingUnitsPerPurchaseUnits   Decimal
+PurchaseQuantity    Decimal
+PurchaseQuantityCost    Decimal
+ExpectedShipDate    Text    30
+ExpectedDockDate    Text    30
+InternalLineComment Text    250
+ExternalLineComment Text    250
+ApprovedByUserName  Text    80 
+ConfirmedByUserName Text    80
+BranchCode  Text    30
+SupplierItemCode    Text    30
+UnitCubes   Decimal
+UnitWeight  Decimal
+SalesOrderNumber    Text    30
+SalesOrderLineNumber    Text    30
+HeaderCreated	Boolean		
+POHeader	Record	Purchase Header	
+POLine	Record	Purchase Line	
+LineCounter	Integer		
+LineCounter2	Integer		
+LineCounterCL	Integer		
+LineCounterCL2	Integer		
+VendorNo	Code		20
+CommentLine	Record	Purch. Comment Line	
+TOHeader	Record	Transfer Header	
+TOLine	Record	Transfer Line	
+TranCommLine	Record	Inventory Comment Line	
+
+Dataport - OnInitDataport()
+
+Dataport - OnPreDataport()
+
+Dataport - OnPostDataport()
+
+Purchase Line - OnPreDataItem()
+// Skip the header line <- NOT NECESSARY ANYMORE
+{
+IF CurrDataport.IMPORT THEN
+  REPEAT
+    CurrFile.READ(cha);
+  UNTIL cha = 10;
+}
+LineCounter := 0;
+LineCounter2 := 0;
+//LineCounterCL := 0;
+//LineCounterCL2 := 0;
+HeaderCreated := FALSE;
+
+Purchase Line - OnBeforeExportRecord()
+
+Purchase Line - OnAfterExportRecord()
+
+Purchase Line - OnBeforeImportRecord()
+
+Purchase Line - OnAfterImportRecord()
+//Here we figure out if the file is a PO or a TO
+OrderType := StockIQImport.SIQPOTO(StockIqOrderNumber)
+
+
+CASE OrderType OF
+  OrderType := 'PO' : BEGIN
+    IF GUIALLOWED THEN
+    //MESSAGE(FORMAT(ItemNum));  // delete me
+    IF ValidItemNo(ItemNum) THEN BEGIN
+      CreatePOHeader;
+      LineCounter += 1;
+      POLine.INIT;
+      POLine."Document Type" := POHeader."Document Type";
+      POLine.Type := POLine.Type::Item;
+      POLine.VALIDATE("Document No.", POHeader."No.");
+      POLine.VALIDATE("Line No.", LineCounter * 10000);
+      POLine.VALIDATE("No.", ItemNum);
+      POLine.VALIDATE(Quantity, Qty);
+        POLine.INSERT(TRUE);
+
+      IF ExternalLineComment <> '' THEN BEGIN
+          // create CommentLine for Line comment
+      END;
+      IF InternalLineComment <> '' THEN BEGIN
+      LineCounterCL2 += 1;
+      CommentLine.INIT;
+      CommentLine."Document Type" := POHeader."Document Type";
+      CommentLine."No." := POHeader."No.";
+      CommentLine.VALIDATE("Document Line No.", LineCounterCL2 * 10000);
+      CommentLine."Line No." := 10000;
+      CommentLine.Date := TODAY;
+      CommentLine.VALIDATE(Comment, InternalLineComment);
+      CommentLine.INSERT(TRUE)
+        // create CommentLine for Internal Line comment
+      END;
+
+    END;
+  END;
+    //ELSE
+    //MESSAGE('Not a valid item\' + ItemNum);
+  OrderType := 'TO' : BEGIN
+    IF GUIALLOWED THEN
+    //MESSAGE(FORMAT(ItemNum));  // delete me
+    IF ValidItemNo(ItemNum) THEN BEGIN
+      CreateTransferOrder;
+      LineCounter2 += 1;
+      TOLine.INIT;
+      TOLine.VALIDATE("Document No.", TOHeader."No.");
+      TOLine.VALIDATE("Line No.", LineCounter2 * 10000);
+      TOLine.VALIDATE("Item No.", ItemNum);
+      TOLine.VALIDATE(Quantity, Qty);
+        TOLine.INSERT(TRUE);
+    END;
+  END;
+END;
+
+Purchase Line - OnPostDataItem()
+
+CreatePOHeader()
+at := '@';
+placedcounter := STRPOS(PlacedBy, at) - 1;
+placedcounter2 := COPYSTR(PlacedBy, 1, placedcounter);
+
+IF NOT HeaderCreated THEN BEGIN
+  LineCounter := 0;
+  POHeader.INIT;
+  POHeader."No." := '';
+  POHeader.VALIDATE("Posting Date", TODAY);
+  POHeader.VALIDATE("Document Type", POHeader."Document Type"::Order);
+  IF VendorNum = '' THEN
+    POHeader.VALIDATE("Buy-from Vendor No.", VendorNo)
+  ELSE
+    POHeader.VALIDATE("Buy-from Vendor No.", VendorNum);
+  POHeader.VALIDATE(PEPONumber, PONum);
+  // POHeader.VALIDATE("Shortcut Dimension 2 Code", ItemLoc);
+  POHeader."Created By" := UPPERCASE(placedcounter2);
+  POHeader."PO Status" := POHeader."PO Status"::Review;
+  POHeader.INSERT(TRUE);
+  POHeader.VALIDATE("Location Code", ItemLoc);
+  HeaderCreated := TRUE;
+  CommentLine.INIT;
+  CommentLine."Document Type" := POHeader."Document Type";
+  CommentLine."No." := POHeader."No.";
+  CommentLine."Document Line No." := 0;
+  CommentLine."Line No." := 10000;
+  CommentLine.Date := TODAY;
+  CommentLine.VALIDATE(CommentLine.Comment, 'Order created with PlanningEdge');
+  CommentLine.INSERT(TRUE);
+
+  IF ExternalHeaderComment <> '' THEN BEGIN
+    // create CommentLine for Header comment
+  END;
+  IF InternalHeaderComment <> '' THEN BEGIN
+  CommentLine.INIT;
+  CommentLine."Document Type" := POHeader."Document Type";
+  CommentLine."No." := POHeader."No.";
+  CommentLine."Document Line No." := 0;
+  CommentLine."Line No." := 20000;
+  CommentLine.Date := TODAY;
+  CommentLine.VALIDATE(CommentLine.Comment, InternalHeaderComment);
+  CommentLine.INSERT(TRUE);
+    // create CommentLine for Internal Header comment
+  END;
+END;
+
+CreateTransferOrder()
+IF NOT HeaderCreated THEN BEGIN
+  LineCounter := 0;
+  IF VendorNum = 'UT' THEN
+    ToLocal := 'PA'
+  ELSE
+    ToLocal := 'UT';
+  TOHeader.INIT;
+  TOHeader."No." := '';
+  TOHeader.VALIDATE(PEPONumber, PONum);
+ // POHeader.VALIDATE("Shortcut Dimension 2 Code", ItemLoc);
+  TOHeader."Created By" := COPYSTR(DELCHR(PlacedBy, '=', '@'), 1, MAXSTRLEN(POHeader."Created By"));
+  IF TOHeader.INSERT(TRUE) THEN
+    TOHeader.VALIDATE("Transfer-from Code", VendorNum);
+    TOHeader.VALIDATE("Transfer-to Code", ToLocal);
+    TOHeader.VALIDATE("Shortcut Dimension 1 Code", TOHeader."Transfer-from Code");
+  HeaderCreated := TRUE;
+  TranCommLine.INIT;
+  TranCommLine."Document Type" := TranCommLine."Document Type"::"Transfer Order";
+  TranCommLine."No." := TOHeader."No.";
+  TranCommLine."Document Line No." := 0;
+  TranCommLine."Line No." := 10000;
+  TranCommLine.Date := TODAY;
+  TranCommLine.VALIDATE(Comment, 'Order created with PlanningEdge');
+  TranCommLine.INSERT(TRUE);
+
+END;
+
+ValidItemNo(ItemNo : Code[20]) : Boolean
+// Do stuff here to make sure it is a valid item number
+IF Item.GET(ItemNo) THEN BEGIN
+  VendorNo := Item."Vendor No.";
+  EXIT(TRUE);
+END;
+
+EXIT(FALSE);
