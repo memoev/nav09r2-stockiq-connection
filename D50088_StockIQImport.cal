@@ -68,6 +68,7 @@ UnitCubes   Decimal
 UnitWeight  Decimal
 SalesOrderNumber    Text    30
 SalesOrderLineNumber    Text    30
+StockIQImport   Codeunit    StockIQImport
 HeaderCreated	Boolean		
 POHeader	Record	Purchase Header	
 POLine	Record	Purchase Line	
@@ -80,7 +81,34 @@ CommentLine	Record	Purch. Comment Line
 TOHeader	Record	Transfer Header	
 TOLine	Record	Transfer Line	
 TranCommLine	Record	Inventory Comment Line
-OrderType   Text    30	
+OrderType   Text    30
+--------------------------------------------------------
+Parameters : (GetVendorNo)
+Var	Name	DataType	Subtype	Length
+No	ItemNo	Code		20
+
+Local Varibles: (GetVendorNo)
+Name	DataType    Subtype	Length
+Item	Record  Item	
+
+Return Value: (GetVendorNo)
+Name: VendorNo
+Return Type: Code
+Length: 20
+--------------------------------------------------------
+Parameters : (ValidItemNo)
+Var	Name	DataType	Subtype	Length
+No	ItemNo	Code		20
+
+Local Varibles: (ValidItemNo)
+Name	DataType    Subtype	Length
+Item	Record  Item	
+
+Return Value: (ValidItemNo)
+Name: 
+Return Type: Boolean
+Length:
+--------------------------------------------------------		
 
 Dataport - OnInitDataport()
 
@@ -111,12 +139,12 @@ Purchase Line - OnBeforeImportRecord()
 Purchase Line - OnAfterImportRecord()
 //Here we figure out if the file is a PO or a TO
 OrderType := StockIQImport.SIQPOTO(StockIqOrderNumber);
-VendorNo : = GetVendorNo(ItemCode);
+//Get Vendor #
+VendorNo := GetVendorNo(ItemCode);
 
+//If the order is a Purchase Order
 CASE OrderType OF
-  OrderType := 'PO' : BEGIN
-    IF GUIALLOWED THEN
-    //MESSAGE(FORMAT(ItemNum));  // delete me
+  'PO' : BEGIN
     IF ValidItemNo(ItemCode) THEN BEGIN
       CreatePOHeader;
       LineCounter += 1;
@@ -125,10 +153,10 @@ CASE OrderType OF
       POLine.Type := POLine.Type::Item;
       POLine.VALIDATE("Document No.", POHeader."No.");
       POLine.VALIDATE("Line No.", LineCounter * 10000);
-      POLine.VALIDATE("No.", ItemNum);
-      POLine.VALIDATE(Quantity, Qty);
-        POLine.INSERT(TRUE);
-
+      POLine.VALIDATE("No.", ItemCode);
+      POLine.VALIDATE(Quantity, PurchaseQuantity);
+      POLine.INSERT(TRUE);
+    {
       IF ExternalLineComment <> '' THEN BEGIN
           // create CommentLine for Line comment
       END;
@@ -144,12 +172,12 @@ CASE OrderType OF
       CommentLine.INSERT(TRUE)
         // create CommentLine for Internal Line comment
       END;
-
+    }
     END;
   END;
-    //ELSE
-    //MESSAGE('Not a valid item\' + ItemNum);
-  OrderType := 'TO' : BEGIN
+{
+//If the order is a Transfer Order
+  'TO' : BEGIN
     IF GUIALLOWED THEN
     //MESSAGE(FORMAT(ItemNum));  // delete me
     IF ValidItemNo(ItemNum) THEN BEGIN
@@ -163,14 +191,16 @@ CASE OrderType OF
         TOLine.INSERT(TRUE);
     END;
   END;
+}
 END;
 
 Purchase Line - OnPostDataItem()
 
 CreatePOHeader()
-at := '@';
-placedcounter := STRPOS(PlacedBy, at) - 1;
-placedcounter2 := COPYSTR(PlacedBy, 1, placedcounter);
+//This depends on whether the BuyerCode contains the code or the email
+//at := '@';
+//placedcounter := STRPOS(PlacedBy, at) - 1;
+//placedcounter2 := COPYSTR(PlacedBy, 1, placedcounter);
 
 IF NOT HeaderCreated THEN BEGIN
   LineCounter := 0;
@@ -178,24 +208,21 @@ IF NOT HeaderCreated THEN BEGIN
   POHeader."No." := '';
   POHeader.VALIDATE("Posting Date", TODAY);
   POHeader.VALIDATE("Document Type", POHeader."Document Type"::Order);
-  IF VendorNum = '' THEN
-    POHeader.VALIDATE("Buy-from Vendor No.", VendorNo)
-  ELSE
-    POHeader.VALIDATE("Buy-from Vendor No.", VendorNum);
-  POHeader.VALIDATE(PEPONumber, PONum);
-  // POHeader.VALIDATE("Shortcut Dimension 2 Code", ItemLoc);
-  POHeader."Created By" := UPPERCASE(placedcounter2);
+  POHeader.VALIDATE("Buy-from Vendor No.", VendorNo);
+  POHeader.VALIDATE(PEPONumber, StockIqOrderNumber);
+  POHeader.VALIDATE("Created By", BuyerCode);
   POHeader."PO Status" := POHeader."PO Status"::Review;
   POHeader.INSERT(TRUE);
-  POHeader.VALIDATE("Location Code", ItemLoc);
+  POHeader.VALIDATE("Location Code", SiteCode);
   HeaderCreated := TRUE;
+  {
   CommentLine.INIT;
   CommentLine."Document Type" := POHeader."Document Type";
   CommentLine."No." := POHeader."No.";
   CommentLine."Document Line No." := 0;
   CommentLine."Line No." := 10000;
   CommentLine.Date := TODAY;
-  CommentLine.VALIDATE(CommentLine.Comment, 'Order created with PlanningEdge');
+  CommentLine.VALIDATE(CommentLine.Comment, 'Order created with StockIQ');
   CommentLine.INSERT(TRUE);
 
   IF ExternalHeaderComment <> '' THEN BEGIN
@@ -212,6 +239,7 @@ IF NOT HeaderCreated THEN BEGIN
   CommentLine.INSERT(TRUE);
     // create CommentLine for Internal Header comment
   END;
+  }
 END;
 
 CreateTransferOrder()
@@ -253,7 +281,6 @@ EXIT(VendorNo);
 ValidItemNo(ItemNo : Code[20]) : Boolean
 // Do stuff here to make sure it is a valid item number
 IF Item.GET(ItemNo) THEN BEGIN
-  VendorNo := Item."Vendor No.";
   EXIT(TRUE);
 END;
 
