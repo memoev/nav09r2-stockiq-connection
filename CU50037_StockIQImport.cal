@@ -21,22 +21,40 @@ Length: 30
 --------------------------------------------------------			
 
 OnRun()
+//SIQPOTO('SIQ-PO00001')
 
-FileRec.SETRANGE(Path, '\\lmnav\c$\StockIQ\LIVE');
+FileRec.SETRANGE(Path, '\\lmnav\c$\StockIQ\LIVE'); //This needs to be changed from lmnav to appserver
 FileRec.SETRANGE(FileRec."Is a file", TRUE);
 IF FileRec.FINDSET THEN REPEAT
-  IF STRPOS(FileRec.Name,'Line') <> 0 THEN
-    IF NOT EXISTS('\\lmnav\c$\StockIQ\LIVE\ARCHIVED\' + FileRec.Name) THEN BEGIN
+  IF STRPOS(FileRec.Name,'Line') <> 0 THEN BEGIN
+    IF NOT EXISTS('\\lmnav\c$\StockIQ\LIVE\ARCHIVED\' + FileRec.Name) THEN BEGIN //This needs to be changed from lmnav to appserver
     CLEAR(StockIQImport);
     StockIQImport.FILENAME := FileRec.Path+ '\' + FileRec.Name;
     StockIQImport.RUNMODAL;
     //You might want to move/delete the file here...
-    FILE.COPY(FileRec.Path+ '\' + FileRec.Name, '\\lmnav\c$\StockIQ\LIVE\ARCHIVED\' + FileRec.Name);
+    FILE.COPY(FileRec.Path+ '\' + FileRec.Name, '\\lmnav\c$\StockIQ\LIVE\ARCHIVED\' + FileRec.Name); //This needs to be changed from lmnav to appserver
     FILE.ERASE(FileRec.Path+ '\' + FileRec.Name)
     END;
+   END;
 UNTIL FileRec.NEXT = 0;
 
-SIQPOTO(SIQNumber : Text[30]) OrderType : Text[30]   
+//This code needed a THEN BEGIN on the second IF statement
+{
+FileRec.SETRANGE(Path, '\\lmnav\PE_TEST\out');
+FileRec.SETRANGE(FileRec."Is a file", TRUE);
+IF FileRec.FIND('-') THEN REPEAT
+  IF NOT EXISTS('\\lmnav\PE_TEST\out\ARCHIVED\' + FileRec.Name) THEN BEGIN
+  CLEAR(StockIQImport);
+  StockIQImport.FILENAME := FileRec.Path+ '\' + FileRec.Name;
+  StockIQImport.RUNMODAL;
+  //You might want to move/delete the file here...
+  FILE.COPY(FileRec.Path+ '\' + FileRec.Name, '\\lmnav\PE_TEST\out\ARCHIVED\' + FileRec.Name);
+  FILE.ERASE(FileRec.Path+ '\' + FileRec.Name)
+  END;
+UNTIL FileRec.NEXT = 0;
+}
+
+SIQPOTO(SIQNumber : Text[30]) OrderType : Text[30]
 dascounter := 0;
 
 dascounter := STRPOS(SIQNumber, 'PO');
@@ -45,4 +63,4 @@ IF dascounter <> 0 THEN
 ELSE
     OrderType := 'TO';
 
-EXIT(OrderType);
+MESSAGE(OrderType);
