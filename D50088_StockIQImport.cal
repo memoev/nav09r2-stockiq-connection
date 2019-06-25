@@ -51,7 +51,7 @@ UnitOfMeasure   Text    30
 StockIqStatus   Text    30
 ReleaseQuantity Decimal
 PurchaseCost    Decimal
-PurchaseCostCurrency    Decimal
+PurchaseCostCurrency    Text    30
 PurchaseUnitOfMeasure   Text    30
 StockingUnitsPerPurchaseUnits   Decimal
 PurchaseQuantity    Decimal
